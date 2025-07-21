@@ -3,201 +3,29 @@
   hosts: localhost
   become: true
 
-  # Update this section with all the appropriate info
-  # TODO: maybe this should be a .env instead?
   vars:
-    ansible_user: "my_username"
     pg_data_dir: "/opt/postgres/data"
-    pg_user: "testuser"
-    pg_password: "testpass"
-    pg_db: "testdb"
-    caddy_site_dir: "/var/www/comingsoon"
-    server_domain: "test.test.org"
+    caddy_site_dir: "/var/www/"
 
-  tasks:
+    #these all come from the .env, sample in this repo
+    #lookup might work weird when I'm running on a remote host.
+    #i'm only ever using localhost, so this works for me.
+    ansible_user: '{{ lookup("env","ANSIBLE_USER") }}'
+    pg_user: '{{ lookup("env", "PG_USER") }}'
+    pg_password: '{{ lookup("env", "PG_PASSWORD") }}'
+    pg_db: '{{ lookup("env", "PG_DB") }}'
+    server_domain: '{{ lookup("env", "SERVER_DOMAIN") }}'
 
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-
-    - name: Install required apt packages
-      apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gnupg
-          - lsb-release
-          - software-properties-common
-          - unzip
-          - ufw
-          - python3
-        state: present
-
-    # ----------------------
-    # Install Docker, give myself permissions to start containers
-    # ----------------------
-
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/debian/gpg
-        state: present
-
-    - name: Add Docker apt repository
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
-        state: present
-        filename: docker
-
-    - name: Install Docker
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-compose-plugin
-        state: latest
-        update_cache: yes
-
-    - name: Add user to docker group
-      user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: yes
-
-    - name: Enable and start Docker
-      systemd:
-        name: docker
-        enabled: yes
-        state: started
+  roles:
+    - apt
+    - docker_psql
+    - caddy
+    - ufw
 
 
-    # ----------------------
-    # PostgreSQL with Docker Compose
-    # ----------------------
-
-    - name: Create PostgreSQL data directory
-      file:
-        path: "{{ pg_data_dir }}"
-        state: directory
-        owner: 999
-        group: 999
-        mode: '0755'
 
 
-    - name: Copy docker-compose.yml
-      copy:
-        dest: /opt/postgres/docker-compose.yml
-        content: |
-          version: '3.8'
 
-          services:
-            db:
-              image: postgres:15
-              restart: unless-stopped
-              environment:
-                POSTGRES_USER: {{ pg_user }} #CHANGE THIS
-                POSTGRES_PASSWORD: {{ pg_password }} #CHANGE THIS
-                POSTGRES_DB: {{ pg_db }}
-              volumes:
-                - ./data:/var/lib/postgresql/data
-              ports:
-                - "5432:5432"
 
-    - name: Start PostgreSQL via docker compose CLI
-      shell: docker compose up -d
-      args:
-        chdir: /opt/postgres
 
-    - name: Wait for PostgreSQL to be ready
-      wait_for:
-        port: 5432
-        host: 127.0.0.1
-        delay: 5
-        timeout: 60
 
-    # ----------------------
-    # Caddy Installation & Site Setup
-    # ----------------------
-
-    - name: Install Caddy GPG key
-      apt_key:
-        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
-        state: present
-
-    - name: Add Caddy repository
-      apt_repository:
-        repo: "deb [trusted=yes] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main"
-        filename: caddy
-        state: present
-
-    - name: Install Caddy
-      apt:
-        name: caddy
-        state: present
-        update_cache: yes
-
-    - name: Create coming soon HTML directory
-      file:
-        path: "{{ caddy_site_dir }}"
-        state: directory
-
-    - name: Write 'coming soon' HTML page
-      copy:
-        dest: "{{ caddy_site_dir }}/index.html"
-        content: |
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>Coming Soon</title>
-          </head>
-          <body>
-              <h1>Coming Soon!</h1>
-          </body>
-          </html>
-
-    - name: Configure Caddyfile with domain
-      copy:
-        dest: /etc/caddy/Caddyfile
-        content: |
-          {{ server_domain }} {
-              root * {{ caddy_site_dir }}
-              file_server
-          }
-
-    - name: Restart Caddy
-      systemd:
-        name: caddy
-        state: restarted
-
-    # ----------------------
-    # Firewall (UFW)
-    # ----------------------
-
-    - name: Allow SSH
-      ufw:
-        rule: allow
-        name: OpenSSH
-
-    - name: Allow HTTP
-      ufw:
-        rule: allow
-        port: 80
-        proto: tcp
-
-    - name: Allow HTTPS
-      ufw:
-        rule: allow
-        port: 443
-        proto: tcp
-
-    - name: Allow PG
-      ufw:
-        rule: allow
-        port: 5432
-        proto: tcp
-
-    - name: Enable UFW
-      ufw:
-        state: enabled
-        policy: deny
