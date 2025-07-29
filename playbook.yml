@@ -18,7 +18,8 @@
 
   roles:
     - apt
-    - docker_psql
+    #- docker_psql
+    - native_psql
     - caddy
     - ufw
 
