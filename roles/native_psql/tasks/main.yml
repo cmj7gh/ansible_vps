@@ -55,3 +55,23 @@
     lc_ctype: 'en_US.UTF-8'
     state: present
   loop: "{{ db_list }}"
+
+
+# ------------------------
+# Setup Backups
+# ------------------------
+
+- name: Copy PostgreSQL backup script
+  copy:
+    src: "{{ role_path }}/files/pg_backup.sh"
+    dest: /usr/local/bin/pg_backup.sh
+    owner: root
+    group: root
+    mode: '0755'  #executable by other (the cron runs as ansible_user, which is me)
+
+- name: Create a cron job to run daily at 2am
+  cron:
+    name: "PostgreSQL daily backup"
+    user: "{{ ansible_user }}"
+    hour: "2"
+    job: "/usr/local/bin/pg_backup.sh"
