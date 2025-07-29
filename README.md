@@ -13,3 +13,8 @@ To use this, follow these steps:
 - After executing, login to psql and change the user password to something more secure
 
 I'll continue adding to this as I learn more - and I welcome any feedback. The next tool that I plan to learn and add is fail2ban, and I need to setup a backup system.
+
+## Update: also added psql using native apt instead of docker.
+The code as written in this repo doesn't work. Here's how to run it:
+
+There are some tricky issues using ansible `become` to run psql commands from an un-privileged user. To get around that, I used a modified version of run.sh that runs ansible-playbook with sudo. I'm not sure if that's proper, so I didn't commit it.
