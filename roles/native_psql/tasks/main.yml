@@ -58,6 +58,32 @@
 
 
 # ------------------------
+# Allow me to login with password, and from remote machines
+# ------------------------
+- name: Ensure PostgreSQL listens on all addresses
+  lineinfile:
+    path: /etc/postgresql/15/main/postgresql.conf
+    regexp: '^#?listen_addresses\s*='
+    line: "listen_addresses = '*'"
+
+- name: Allow local password login
+  lineinfile:
+    path: /etc/postgresql/15/main/pg_hba.conf
+    insertafter: '^#.*TYPE.*DATABASE.*USER.*ADDRESS.*METHOD'
+    line: "local   all             {{ pg_user }}                                   md5"
+
+- name: Allow remote password login from anywhere
+  lineinfile:
+    path: /etc/postgresql/15/main/pg_hba.conf
+    insertafter: '^#.*TYPE.*DATABASE.*USER.*ADDRESS.*METHOD'
+    line: "host    all             {{ pg_user }}           0.0.0.0/0               md5"
+
+- name: Restart PostgreSQL
+  service:
+    name: postgresql
+    state: restarted
+
+# ------------------------
 # Setup Backups
 # ------------------------
 
